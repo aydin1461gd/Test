@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🌊 WordFlow</title>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --accent:#7c3aed; --muted:#98a0b3;
+      color-scheme:dark;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      background:linear-gradient(180deg,#071028 0%, #0f1724 100%); color:#e7eef8;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding:24px;
+    }
+
+    .wrap{
+      width:720px; max-width:94vw; background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+      border-radius:14px; padding:22px; box-shadow:0 20px 60px rgba(2,6,23,0.6);
+    }
+
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    h1{margin:0;font-size:20px}
+    .small{color:var(--muted); font-size:13px}
+
+    .card{background:rgba(255,255,255,0.03); padding:18px; border-radius:12px; margin-top:16px; border:1px solid rgba(255,255,255,0.03)}
+
+    .word{
+      display:flex;align-items:center;justify-content:space-between;gap:12px;
+    }
+    .word .txt{
+      font-size:36px;font-weight:800;letter-spacing:0.6px;
+    }
+    .meta{color:var(--muted); font-weight:700}
+
+    .controls{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+    button{
+      background:linear-gradient(90deg,var(--accent),#4f46e5); color:white;border:none;padding:10px 14px;border-radius:10px;
+      cursor:pointer;font-weight:700;
+    }
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04); color:var(--muted); font-weight:700}
+    .btn-ghost:hover{transform:translateY(-2px)}
+
+    .info{margin-top:12px;color:var(--muted);font-size:15px;line-height:1.5}
+    .example{margin-top:8px;background:rgba(255,255,255,0.02);padding:10px;border-radius:8px;font-style:italic;color:#dfe9ff}
+
+    .favorites{margin-top:16px; display:flex; gap:8px; flex-wrap:wrap}
+    .pill{background:rgba(255,255,255,0.03); padding:8px 10px;border-radius:999px; font-weight:700; font-size:13px; display:flex; gap:8px; align-items:center}
+    .pill button{background:transparent;border:none;color:var(--muted);cursor:pointer;font-weight:700}
+
+    footer{display:flex;justify-content:space-between;align-items:center;margin-top:18px;color:var(--muted);font-size:13px}
+    .center{display:flex;gap:8px;align-items:center}
+
+    @media (max-width:520px){
+      .word .txt{font-size:28px}
+      .wrap{padding:14px}
+      button{padding:8px 10px}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <header>
+      <div>
+        <h1>🌊 WordFlow</h1>
+        <div class="small">Kelime öğren. Dinle. Favori ekle.</div>
+      </div>
+      <div class="small" id="timeHint"></div>
+    </header>
+
+    <div class="card" aria-live="polite">
+      <div class="word">
+        <div>
+          <div class="txt" id="wordText">—</div>
+          <div class="meta" id="phonetic">/ — / · <span id="pos">—</span></div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+          <button id="playBtn" title="Sesli okuma">🔊 Dinle</button>
+          <button id="favBtn" class="btn-ghost" title="Favorilere ekle">☆ Favori</button>
+        </div>
+      </div>
+
+      <div class="info" id="definition">Kelime ve tanım burada görünecek.</div>
+      <div class="example" id="example">Örnek cümle burada.</div>
+
+      <div class="controls">
+        <button id="newBtn">Yeni Kelime</button>
+        <button id="autoBtn" class="btn-ghost">Otomatik (3s)</button>
+        <button id="clearFavs" class="btn-ghost">Favorileri Temizle</button>
+      </div>
+
+      <div style="margin-top:12px;">
+        <div class="small">Favoriler</div>
+        <div class="favorites" id="favoritesList" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <footer>
+      <div class="small">Not: Bu küçük dahili listeden rastgele seçer — çevrimdışı çalışır.</div>
+      <div class="center"><button id="downloadBtn" class="btn-ghost">Favorileri İndir</button></div>
+    </footer>
+  </div>
+
+  <script>
+    // ---- küçük kelime veritabanı (dilediğin kadar ekle) ----
+    const WORDS = [
+  {w:"improve", p:"/ɪmˈpruːv/", pos:"verb", def:"geliştirmek", ex:"She wants to improve her English skills."},
+  {w:"opportunity", p:"/ˌɒpərˈtjuːnɪti/", pos:"noun", def:"fırsat", ex:"This is a great opportunity to travel."},
+  {w:"although", p:"/ɔːlˈðoʊ/", pos:"conj", def:"olsa da", ex:"Although it was raining, we went out."},
+  {w:"suggest", p:"/səˈdʒɛst/", pos:"verb", def:"önermek", ex:"I suggest taking a short break."},
+  {w:"responsible", p:"/rɪˈspɒnsəbl/", pos:"adj", def:"sorumlu", ex:"He is responsible for the project."},
+  {w:"pattern", p:"/ˈpætərn/", pos:"noun", def:"desen", ex:"The wallpaper has a floral pattern."},
+  {w:"continue", p:"/kənˈtɪnjuː/", pos:"verb", def:"devam etmek", ex:"We will continue our work tomorrow."},
+  {w:"develop", p:"/dɪˈvɛləp/", pos:"verb", def:"geliştirmek", ex:"She hopes to develop new skills."},
+  {w:"survive", p:"/sərˈvaɪv/", pos:"verb", def:"hayatta kalmak", ex:"The plants survive in harsh conditions."},
+  {w:"behave", p:"/bɪˈheɪv/", pos:"verb", def:"davranmak", ex:"Children should behave in class."},
+  {w:"research", p:"/rɪˈsɜːrtʃ/", pos:"noun", def:"araştırma", ex:"She is conducting research on climate change."},
+  {w:"avoid", p:"/əˈvɔɪd/", pos:"verb", def:"kaçınmak", ex:"Try to avoid making mistakes."},
+  {w:"prepare", p:"/prɪˈpɛər/", pos:"verb", def:"hazırlamak", ex:"We need to prepare for the meeting."},
+  {w:"compare", p:"/kəmˈpɛər/", pos:"verb", def:"karşılaştırmak", ex:"Compare the two products before buying."},
+  {w:"attract", p:"/əˈtrækt/", pos:"verb", def:"çekmek", ex:"The park attracts many tourists."},
+  {w:"achieve", p:"/əˈtʃiːv/", pos:"verb", def:"başarmak", ex:"She wants to achieve her dreams."},
+  {w:"concern", p:"/kənˈsɜːrn/", pos:"noun", def:"endişe, ilgi", ex:"Health is a major concern."},
+  {w:"reduce", p:"/rɪˈdjuːs/", pos:"verb", def:"azaltmak", ex:"We should reduce waste."},
+  {w:"community", p:"/kəˈmjuːnɪti/", pos:"noun", def:"topluluk", ex:"The community organized a clean-up."},
+  {w:"include", p:"/ɪnˈkluːd/", pos:"verb", def:"dahil etmek", ex:"Please include your email address."},
+  {w:"agree", p:"/əˈɡriː/", pos:"verb", def:"katılmak", ex:"I agree with your idea."},
+  {w:"decide", p:"/dɪˈsaɪd/", pos:"verb", def:"karar vermek", ex:"She will decide tomorrow."},
+  {w:"wonder", p:"/ˈwʌndər/", pos:"verb", def:"merak etmek", ex:"I wonder what will happen next."},
+  {w:"effective", p:"/ɪˈfɛktɪv/", pos:"adj", def:"etkili", ex:"Exercise is an effective way to reduce stress."},
+  {w:"instead", p:"/ɪnˈstɛd/", pos:"adv", def:"yerine", ex:"He chose tea instead of coffee."},
+  {w:"increase", p:"/ɪnˈkriːs/", pos:"verb", def:"arttırmak", ex:"We need to increase production."},
+  {w:"discover", p:"/dɪˈskʌvər/", pos:"verb", def:"keşfetmek", ex:"Scientists discover new planets."},
+  {w:"depend", p:"/dɪˈpɛnd/", pos:"verb", def:"bağlı olmak", ex:"You can depend on me."},
+  {w:"involve", p:"/ɪnˈvɒlv/", pos:"verb", def:"içermek, dahil etmek", ex:"This project will involve everyone."},
+  {w:"available", p:"/əˈveɪləbl/", pos:"adj", def:"mevcut", ex:"The book is available online."},
+  {w:"encourage", p:"/ɪnˈkʌrɪdʒ/", pos:"verb", def:"cesaretlendirmek", ex:"Teachers encourage students to read."},
+  {w:"determine", p:"/dɪˈtɜːrmɪn/", pos:"verb", def:"belirlemek", ex:"We need to determine the cause."},
+  {w:"consider", p:"/kənˈsɪdər/", pos:"verb", def:"düşünmek", ex:"Consider all options before choosing."},
+  {w:"choice", p:"/ʧɔɪs/", pos:"noun", def:"seçim", ex:"You have a difficult choice."},
+  {w:"support", p:"/səˈpɔːrt/", pos:"verb", def:"desteklemek", ex:"We support our local businesses."},
+  {w:"mention", p:"/ˈmɛnʃən/", pos:"verb", def:"bahsetmek", ex:"He mentioned the problem in the meeting."},
+  {w:"manage", p:"/ˈmænɪdʒ/", pos:"verb", def:"yönetmek", ex:"She manages the team efficiently."},
+  {w:"organize", p:"/ˈɔːrɡənaɪz/", pos:"verb", def:"düzenlemek", ex:"We need to organize the files."},
+  {w:"require", p:"/rɪˈkwaɪər/", pos:"verb", def:"gerektirmek", ex:"This task will require focus."},
+  {w:"particular", p:"/pərˈtɪkjələr/", pos:"adj", def:"belirli", ex:"He has a particular interest in music."},
+  {w:"necessary", p:"/ˈnɛsəsəri/", pos:"adj", def:"gerekli", ex:"It is necessary to study regularly."},
+  {w:"happen", p:"/ˈhæpən/", pos:"verb", def:"olmak", ex:"Accidents happen all the time."},
+  {w:"separate", p:"/ˈsɛpəreɪt/", pos:"verb", def:"ayırmak", ex:"Separate the documents into folders."},
+  {w:"contain", p:"/kənˈteɪn/", pos:"verb", def:"içermek", ex:"The box contains books."},
+  {w:"imagine", p:"/ɪˈmædʒɪn/", pos:"verb", def:"hayal etmek", ex:"Imagine a world without war."},
+  {w:"approach", p:"/əˈproʊʧ/", pos:"verb", def:"yaklaşmak", ex:"She will approach the topic carefully."},
+  {w:"prevent", p:"/prɪˈvɛnt/", pos:"verb", def:"önlemek", ex:"Vaccines prevent diseases."},
+  {w:"argue", p:"/ˈɑːrɡjuː/", pos:"verb", def:"tartışmak", ex:"They argue about politics."},
+  {w:"protect", p:"/prəˈtɛkt/", pos:"verb", def:"korumak", ex:"Use sunscreen to protect your skin."},
+  {w:"represent", p:"/ˌrɛprɪˈzɛnt/", pos:"verb", def:"temsil etmek", ex:"The flag represents the country."},
+  {w:"explain", p:"/ɪkˈspleɪn/", pos:"verb", def:"açıklamak", ex:"She will explain the procedure."},
+  {w:"choose", p:"/ʧuːz/", pos:"verb", def:"seçmek", ex:"Choose the best option."},
+  {w:"recognize", p:"/ˈrɛkəɡnaɪz/", pos:"verb", def:"tanımak", ex:"I recognize her from school."},
+  {w:"introduce", p:"/ˌɪntrəˈdjuːs/", pos:"verb", def:"tanıtmak", ex:"Allow me to introduce my friend."},
+  {w:"maintain", p:"/meɪnˈteɪn/", pos:"verb", def:"sürdürmek", ex:"Maintain a healthy lifestyle."},
+  {w:"allow", p:"/əˈlaʊ/", pos:"verb", def:"izin vermek", ex:"Parents allow children to play outside."},
+  {w:"provide", p:"/prəˈvaɪd/", pos:"verb", def:"sağlamak", ex:"The school provides free lunches."},
+  {w:"practice", p:"/ˈpræktɪs/", pos:"verb", def:"pratik yapmak", ex:"Practice your English every day."},
+  {w:"solution", p:"/səˈluːʃən/", pos:"noun", def:"çözüm", ex:"We need a solution quickly."},
+  {w:"remain", p:"/rɪˈmeɪn/", pos:"verb", def:"kalmak", ex:"Please remain seated."}
+];
+
+
+
+
+    // ---- state ----
+    let current = null;
+    let autoInterval = null;
+    const favoritesKey = "random_word_favs_v1";
+
+    // ---- elements ----
+    const wordText = document.getElementById("wordText");
+    const phonetic = document.getElementById("phonetic");
+    const posEl = document.getElementById("pos");
+    const definition = document.getElementById("definition");
+    const example = document.getElementById("example");
+    const newBtn = document.getElementById("newBtn");
+    const playBtn = document.getElementById("playBtn");
+    const favBtn = document.getElementById("favBtn");
+    const favoritesList = document.getElementById("favoritesList");
+    const autoBtn = document.getElementById("autoBtn");
+    const clearFavs = document.getElementById("clearFavs");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const timeHint = document.getElementById("timeHint");
+
+    // ---- helpers ----
+    function randInt(max){ return Math.floor(Math.random()*max); }
+
+    function pickRandom(){
+      const idx = randInt(WORDS.length);
+      return WORDS[idx];
+    }
+
+    function renderWord(obj){
+      current = obj;
+      wordText.textContent = obj.w;
+      phonetic.textContent = `${obj.p} ·`;
+      posEl.textContent = obj.pos;
+      definition.textContent = obj.def;
+      example.textContent = obj.ex;
+      // favori buton güncelle
+      const favs = getFavs();
+      favBtn.textContent = favs.some(f=> f.w === obj.w ) ? "★ Favori" : "☆ Favori";
+    }
+
+    function speak(text){
+      if(!("speechSynthesis" in window)){
+        alert("Tarayıcınız sesli okuma desteklemiyor.");
+        return;
+      }
+      const msg = new SpeechSynthesisUtterance(text);
+      msg.lang = "en-GB";
+      // tercih: kelimeyi daha vurgulu oku
+      msg.rate = 0.95;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(msg);
+    }
+
+    // ---- favorites (localStorage) ----
+    function getFavs(){
+      try{
+        const raw = localStorage.getItem(favoritesKey);
+        return raw ? JSON.parse(raw) : [];
+      }catch(e){
+        return [];
+      }
+    }
+    function saveFavs(arr){
+      localStorage.setItem(favoritesKey, JSON.stringify(arr));
+      renderFavs();
+    }
+    function toggleFav(){
+      if(!current) return;
+      const arr = getFavs();
+      const idx = arr.findIndex(f=> f.w === current.w);
+      if(idx >= 0){ arr.splice(idx,1); } else { arr.unshift(current); }
+      saveFavs(arr);
+      favBtn.textContent = arr.find(f=> f.w === current.w) ? "★ Favori" : "☆ Favori";
+    }
+
+    function renderFavs(){
+      const arr = getFavs();
+      favoritesList.innerHTML = "";
+      if(arr.length === 0){
+        favoritesList.innerHTML = `<div class="small" style="color:var(--muted)">Henüz favoriniz yok — eklemek için ☆ Favori'ye tıkla.</div>`;
+        return;
+      }
+      arr.forEach(item => {
+        const el = document.createElement("div");
+        el.className = "pill";
+        el.innerHTML = `<span>${item.w} <small style="margin-left:6px;color:var(--muted);font-weight:600">(${item.pos})</small></span>`;
+        const btn = document.createElement("button");
+        btn.title = "Kaldır";
+        btn.innerText = "✕";
+        btn.addEventListener("click", ()=> {
+          const arr2 = getFavs().filter(f=> f.w !== item.w);
+          saveFavs(arr2);
+        });
+        el.appendChild(btn);
+        el.addEventListener("click", () => {
+          renderWord(item);
+          speak(item.w);
+        });
+        favoritesList.appendChild(el);
+      });
+    }
+
+    // ---- actions ----
+    newBtn.addEventListener("click", () => {
+      const r = pickRandom();
+      renderWord(r);
+    });
+
+    playBtn.addEventListener("click", ()=> {
+      if(current) speak(current.w);
+    });
+
+    favBtn.addEventListener("click", ()=> toggleFav());
+
+    autoBtn.addEventListener("click", ()=>{
+      if(autoInterval){
+        clearInterval(autoInterval);
+        autoInterval = null;
+        autoBtn.textContent = "Otomatik (3s)";
+        autoBtn.classList.add("btn-ghost");
+      } else {
+        autoInterval = setInterval(()=> {
+          const r = pickRandom(); renderWord(r);
+        }, 3000);
+        autoBtn.textContent = "Durdur";
+        autoBtn.classList.remove("btn-ghost");
+      }
+    });
+
+    clearFavs.addEventListener("click", ()=> {
+      if(confirm("Favorileri silmek istediğine emin misin?")){
+        saveFavs([]);
+      }
+    });
+
+    downloadBtn.addEventListener("click", ()=>{
+      const arr = getFavs();
+      if(arr.length === 0){ alert("İndirilecek favori yok."); return; }
+      const blob = new Blob([JSON.stringify(arr, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "favorites_words.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // ---- init ----
+    function init(){
+      renderFavs();
+      // ilk gösterim
+      const first = pickRandom();
+      renderWord(first);
+
+      // saate göre kısa ipucu (sabah/öğlen/akşam)
+      const h = new Date().getHours();
+      const hint = h < 12 ? "Good morning — learn a word!" : (h < 18 ? "Good afternoon — learn a word!" : "Good evening — learn a word!");
+      timeHint.textContent = hint;
+    }
+
+    init();
+  </script>
+</body>
+</html>
